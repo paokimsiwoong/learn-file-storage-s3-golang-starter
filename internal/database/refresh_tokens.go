@@ -44,6 +44,8 @@ func (c Client) RevokeRefreshToken(token string) error {
 		SET revoked_at = CURRENT_TIMESTAMP
 		WHERE token = ?
 	`
+	// SET revoked_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 로 updated_at도 수정할 필요가 있어보임
+
 	_, err := c.db.Exec(query, token)
 	return err
 }

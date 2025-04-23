@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// POST /api/thumbnail_upload/{videoID} handler : 전달 받은 썸네일을 db에 저장
 func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Request) {
 	videoIDString := r.PathValue("videoID")
 	videoID, err := uuid.Parse(videoIDString)

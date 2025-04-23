@@ -2,6 +2,7 @@ package main
 
 import "net/http"
 
+// POST /admin/reset handler : db 리셋
 func (cfg *apiConfig) handlerReset(w http.ResponseWriter, r *http.Request) {
 	if cfg.platform != "dev" {
 		w.WriteHeader(http.StatusForbidden)

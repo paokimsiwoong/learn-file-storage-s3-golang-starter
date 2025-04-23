@@ -8,12 +8,14 @@ import (
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
 )
 
+// POST /api/users handler : 유저 생성 및 db 저장
 func (cfg *apiConfig) handlerUsersCreate(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Password string `json:"password"`
 		Email    string `json:"email"`
 	}
 
+	// request body decoding
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
 	err := decoder.Decode(&params)
@@ -22,17 +24,20 @@ func (cfg *apiConfig) handlerUsersCreate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// request body의 password, email 필드가 제대로 들어왔는지 확인 후 예외 처리
 	if params.Password == "" || params.Email == "" {
 		respondWithError(w, http.StatusBadRequest, "Email and password are required", nil)
 		return
 	}
 
+	// 암호 hashing
 	hashedPassword, err := auth.HashPassword(params.Password)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't hash password", err)
 		return
 	}
 
+	// db의 users 테이블에 새 record 추가
 	user, err := cfg.db.CreateUser(database.CreateUserParams{
 		Email:    params.Email,
 		Password: hashedPassword,

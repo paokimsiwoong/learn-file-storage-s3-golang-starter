@@ -80,6 +80,9 @@ func (c Client) GetUserByRefreshToken(token string) (*User, error) {
 		JOIN refresh_tokens rt ON u.id = rt.user_id
 		WHERE rt.token = ?
 	`
+	// http 서버 과정에서는 where 구문에
+	// 추가로 AND revoked_at IS NULL AND expires_at > NOW(); 을 써서 만료, 파기 여부도 확인함
+	// @@@ sqlite는 NOW()가 없으므로 대신 expires_at > CURRENT_TIMESTAMP; 써야함
 
 	var user User
 	var id string
@@ -107,7 +110,10 @@ func (c Client) CreateUser(params CreateUserParams) (*User, error) {
 		VALUES
 		    (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?)
 	`
+	// @@@ sqlite는 NOW()없고 대신 CURRENT_TIMESTAMP 써야함
+
 	_, err := c.db.Exec(query, id.String(), params.Email, params.Password)
+	// @@@ users 테이블의 id는 UUID가 아니고 TEXT이므로 db에 입력할 떄 uuid를 반드시 string화한 후 입력해야 함
 	if err != nil {
 		return nil, err
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
 )
 
+// POST /api/login handler : 로그인 요청 처리
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Password string `json:"password"`
@@ -20,6 +21,7 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		RefreshToken string `json:"refresh_token"`
 	}
 
+	// request body decoding
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
 	err := decoder.Decode(&params)
@@ -28,18 +30,21 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// db에서 email로 user 데이터 불러오기
 	user, err := cfg.db.GetUserByEmail(params.Email)
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, "Incorrect email or password", err)
 		return
 	}
 
+	// 암호 일치 여부 확인
 	err = auth.CheckPasswordHash(params.Password, user.Password)
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, "Incorrect email or password", err)
 		return
-	}
+	} // err == nil 이면 비밀번호 일치
 
+	// JWT 생성
 	accessToken, err := auth.MakeJWT(
 		user.ID,
 		cfg.jwtSecret,
@@ -50,12 +55,14 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// refresh token (32 byte hex-encoded string) 생성
 	refreshToken, err := auth.MakeRefreshToken()
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create refresh token", err)
 		return
 	}
 
+	// db에 생성한 refresh token 입력
 	_, err = cfg.db.CreateRefreshToken(database.CreateRefreshTokenParams{
 		UserID:    user.ID,
 		Token:     refreshToken,

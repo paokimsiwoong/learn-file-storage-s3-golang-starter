@@ -6,6 +6,7 @@ import (
 	"net/http"
 )
 
+// 에러 response에 쓰이는 함수
 func respondWithError(w http.ResponseWriter, code int, msg string, err error) {
 	if err != nil {
 		log.Println(err)
@@ -21,6 +22,7 @@ func respondWithError(w http.ResponseWriter, code int, msg string, err error) {
 	})
 }
 
+// 정상 JSON response에 쓰이는 함수
 func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	dat, err := json.Marshal(payload)
