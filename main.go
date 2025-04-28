@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
-	"github.com/google/uuid"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -26,13 +25,13 @@ type apiConfig struct {
 }
 
 // 썸네일 데이터와 데이터 타입을 담는 구조체
-type thumbnail struct {
-	data      []byte
-	mediaType string
-}
+// type thumbnail struct {
+// 	data      []byte
+// 	mediaType string
+// }
 
 // video의 uuid id와 썸네일을 연결하는 글로벌 맵
-var videoThumbnails = map[uuid.UUID]thumbnail{}
+// var videoThumbnails = map[uuid.UUID]thumbnail{}
 
 func main() {
 	// @@@ 환경변수, db 초기화 섹션 시작 @@@
@@ -151,7 +150,7 @@ func main() {
 	mux.HandleFunc("POST /api/video_upload/{videoID}", cfg.handlerUploadVideo)
 	mux.HandleFunc("GET /api/videos", cfg.handlerVideosRetrieve)
 	mux.HandleFunc("GET /api/videos/{videoID}", cfg.handlerVideoGet)
-	mux.HandleFunc("GET /api/thumbnails/{videoID}", cfg.handlerThumbnailGet)
+	// mux.HandleFunc("GET /api/thumbnails/{videoID}", cfg.handlerThumbnailGet) // @@@ base64 도입 후 GET /api/thumbnails/{videoID} 삭제
 	mux.HandleFunc("DELETE /api/videos/{videoID}", cfg.handlerVideoMetaDelete)
 
 	mux.HandleFunc("POST /admin/reset", cfg.handlerReset)
