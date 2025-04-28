@@ -4,10 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -60,10 +59,15 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	defer file.Close()
 
 	// file이 무슨 파일인지 header에서 정보 가져오기 (이 header는 썸네일 파일의 헤더 *multipart.FileHeader)
-	mediaType := header.Header.Get("Content-Type")
-	// @@@ 해답처럼 헤더가 제대로 설정되지 않은 경우 예외 처리
-	if mediaType == "" {
-		respondWithError(w, http.StatusBadRequest, "Missing Content-Type for thumbnail", nil)
+	// @@@ Content-Type 헤더 안에 MIME type 형태로 데이터가 들어 있으므로 mime.ParseMediaType 사용
+	mediaType, _, err := mime.ParseMediaType(header.Header.Get("Content-Type"))
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid Content-Type", err)
+		return
+	}
+	// 썸네일이 image/jpeg나 image/png이 아닌 경우 에러 예외 처리
+	if mediaType != "image/jpeg" && mediaType != "image/png" {
+		respondWithError(w, http.StatusBadRequest, "thumbnail file type must be either jpeg or png", err)
 		return
 	}
 
@@ -109,14 +113,17 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	// @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 	// mediaType은 image/<확장자> 형태이므로 확장자만 가져오기
-	assetExtension := strings.Split(mediaType, "/")[1]
+	// assetExtension := strings.Split(mediaType, "/")[1]
+	// @@@ assts.go의 getAssetPath 함수 대신 사용
 
 	// 파일 이름은 <videoID>.<file_extension>
-	assetName := fmt.Sprintf("%s.%s", videoIDString, assetExtension)
+	assetName := getAssetPath(videoID, mediaType)
 
 	// ./assets 과 <videoID>.<file_extension> 를 filepath.join으로 경로 합치기
 	// ==> ./assets/<videoID>.<file_extension>
-	assetPath := filepath.Join(cfg.assetsRoot, assetName)
+	// assetPath := filepath.Join(cfg.assetsRoot, assetName)
+	// @@@ assets.go의 cfg.getAssetDiskPath 대신 사용
+	assetPath := cfg.getAssetDiskPath(assetName)
 
 	// asset 경로에 빈 파일 컨테이너 생성
 	assetFile, err := os.Create(assetPath)
@@ -138,7 +145,9 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	}
 
 	// 썸네일 url 생성
-	newThumbnailURL := fmt.Sprintf("http://localhost:%s/assets/%s", cfg.port, assetName)
+	// newThumbnailURL := fmt.Sprintf("http://localhost:%s/assets/%s", cfg.port, assetName)
+	// @@@ assets.go의 cfg.getAssetURL 대신 사용
+	newThumbnailURL := cfg.getAssetURL(assetName)
 
 	// video의 ThumbnailURL 필드 갱신
 	video.ThumbnailURL = &newThumbnailURL
