@@ -1,11 +1,13 @@
 package main
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -65,12 +67,16 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+	// @@@ io.Copy 사용하면서 io.ReadAll 사용 안함
 	// io.ReadAll은 io.Reader를 입력으로 받아 []byte, error 출력
-	data, err := io.ReadAll(file)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Unable to read file", err)
-		return
-	}
+	// file은 multipart.File 인터페이스를 구현하고 multipart.File의 구현 조건에는 io.Reader 인터페이스 구현 조건이 포함된다
+	// data, err := io.ReadAll(file)
+	// if err != nil {
+	// 	respondWithError(w, http.StatusInternalServerError, "Unable to read file", err)
+	// 	return
+	// }
+	// @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 	// db에서 videoID로 해당 video 메타데이터를 담은 database.Video 불러오기
 	video, err := cfg.db.GetVideo(videoID)
@@ -85,6 +91,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	// @@@ base64 도입 후 글로벌 맵 삭제
 	// // 썸네일 데이터를 담는 구조체 생성
 	// newThumbnail := thumbnail{
@@ -95,11 +102,43 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	// // videoThumbnails는 map[uuid.UUID]thumbnail 인 글로벌 맵
 	// videoThumbnails[videoID] = newThumbnail
 
+	// @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	// []byte를 base64 encoding
-	encoded := base64.StdEncoding.EncodeToString(data)
+	// encoded := base64.StdEncoding.EncodeToString(data)
+	// // @@@ 느린 base64대신 file system 사용하도록 변경
+	// @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+	// mediaType은 image/<확장자> 형태이므로 확장자만 가져오기
+	assetExtension := strings.Split(mediaType, "/")[1]
+
+	// 파일 이름은 <videoID>.<file_extension>
+	assetName := fmt.Sprintf("%s.%s", videoIDString, assetExtension)
+
+	// ./assets 과 <videoID>.<file_extension> 를 filepath.join으로 경로 합치기
+	// ==> ./assets/<videoID>.<file_extension>
+	assetPath := filepath.Join(cfg.assetsRoot, assetName)
+
+	// asset 경로에 빈 파일 컨테이너 생성
+	assetFile, err := os.Create(assetPath)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Unable to create asset file", err)
+		return
+	}
+	// @@@ 해답처럼 *os.File 도 Close를 defer로 걸어두기
+	defer assetFile.Close()
+
+	// 썸네일 데이터를 asset 경로에 복사
+	_, err = io.Copy(assetFile, file)
+	// file multipart.File은 io.Reader 인터페이스를 구현하고
+	// assetFile *os.File은 io.Writer 인터페이스를 구현
+	// 복사 후 몇 바이트를 복사했는지 반환하는 것은 필요 없으므로 _ 처리
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Unable to copy asset file", err)
+		return
+	}
 
 	// 썸네일 url 생성
-	newThumbnailURL := fmt.Sprintf("data:%s;base64,%s", mediaType, encoded)
+	newThumbnailURL := fmt.Sprintf("http://localhost:%s/assets/%s", cfg.port, assetName)
 
 	// video의 ThumbnailURL 필드 갱신
 	video.ThumbnailURL = &newThumbnailURL
