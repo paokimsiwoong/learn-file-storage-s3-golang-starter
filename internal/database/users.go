@@ -13,6 +13,9 @@ type User struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	CreateUserParams
+	// embedded struct를 사용
+	// ==> CreateUserParams의 필드 접근은 nested struct와 다르게
+	// ==> user.Email, user.Password 로 마치 user의 일반적인 필드처럼 접근 가능
 }
 
 type CreateUserParams struct {
