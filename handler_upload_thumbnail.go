@@ -116,8 +116,21 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	// assetExtension := strings.Split(mediaType, "/")[1]
 	// @@@ assts.go의 getAssetPath 함수 대신 사용
 
-	// 파일 이름은 <videoID>.<file_extension>
-	assetName := getAssetPath(videoID, mediaType)
+	// 파일 이름은 <videoID>.<file_extension> @@@ 매번 다른 경로가 되도록 videoID 대신 랜덤 생성값 사용하도록 변경
+	// @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+	// @@@ 해답처럼 random 값 생성을 getAssetPath 함수 안으로 집어 넣도록 수정
+	// 32 bytes 슬라이스 생성
+	// randBytes := make([]byte, 32)
+	// // crypto/rand.Read함수는 입력한 []byte에 랜덤 값 채워주는 함수
+	// _, err = rand.Read(randBytes)
+	// if err != nil { // @@@ Read fills b with cryptographically secure random bytes. It never returns an error, and always fills b entirely.
+	// 	respondWithError(w, http.StatusInternalServerError, "Unable to create random bytes", err)
+	// 	return
+	// }
+	// randName := base64.RawURLEncoding.EncodeToString(randBytes)
+	// assetName := getAssetPath(randName, mediaType)
+	assetName := getAssetPath(mediaType)
+	// @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 	// ./assets 과 <videoID>.<file_extension> 를 filepath.join으로 경로 합치기
 	// ==> ./assets/<videoID>.<file_extension>

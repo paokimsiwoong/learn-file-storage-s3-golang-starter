@@ -5,9 +5,10 @@ import "net/http"
 // 이 middleware로 http.Handler를 감싸는 새로운 http.Handler 반환
 // 이 새 http.Handler는 원본 http.Handler의 ServeHTTP메소드를 그대로 호출하면서
 // 추가로 원본 호출 직전에 http.ResponseWriter의 cache관련 header를 설정한다
-func cacheMiddleware(next http.Handler) http.Handler {
+func noCacheMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "max-age=3600")
+		// w.Header().Set("Cache-Control", "max-age=3600")
+		w.Header().Set("Cache-Control", "no-store")
 		next.ServeHTTP(w, r)
 	})
 	// @@@@@ type HandlerFunc func(ResponseWriter, *Request)은 일반 함수를 http.Handler로 취급할 수 있게 해주는 일종의 툴

@@ -135,8 +135,10 @@ func main() {
 	// 위의 /app file server 생성의 경우와 거의 동일하게 /assets 경로에 file 서버 핸들러 연결하면서
 	// 추가로 cacheMiddleware 적용
 	assetsHandler := http.StripPrefix("/assets", http.FileServer(http.Dir(assetsRoot)))
-	mux.Handle("/assets/", cacheMiddleware(assetsHandler))
+	// mux.Handle("/assets/", cacheMiddleware(assetsHandler))
 	// cacheMiddleware는 response에 캐쉬 관련 헤더를 설정하도록 하는 middleware
+	mux.Handle("/assets/", noCacheMiddleware(assetsHandler))
+	// 리스폰스의 Cache-Control 헤더를 no-store로 설정하는 middleware
 
 	// api 계열 엔드포인트 handler 등록
 	mux.HandleFunc("POST /api/login", cfg.handlerLogin)

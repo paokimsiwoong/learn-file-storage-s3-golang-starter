@@ -261,10 +261,11 @@ function viewVideo(video) {
     thumbnailImg.style.display = 'none';
   } else {
     thumbnailImg.style.display = 'block';
-    // thumbnailImg.src = video.thumbnail_url;
+    thumbnailImg.src = video.thumbnail_url;
+    // @@@ client side cache busting 삭제
     // thumbnailImg.src = `${video.thumbnail_url}?v=${Date.now()}`; @@@ 해답도 이렇게 함
-    let currentTime = Date.now()
-    thumbnailImg.src = `${video.thumbnail_url}?v=${currentTime}`;
+    // let currentTime = Date.now()
+    // thumbnailImg.src = `${video.thumbnail_url}?v=${currentTime}`;
   }
 
   const videoPlayer = document.getElementById('video-player');
