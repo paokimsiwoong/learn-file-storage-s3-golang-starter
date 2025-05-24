@@ -52,6 +52,12 @@ func (cfg apiConfig) getAssetURL(assetPath string) string {
 	return fmt.Sprintf("http://localhost:%s/assets/%s", cfg.port, assetPath)
 }
 
+// s3에 저장되는 객체의 url 생성하는 apiConfig method
+func (cfg apiConfig) getObjectURL(fileName string) string {
+	// https://<bucket-name>.s3.<region>.amazonaws.com/<key> 형태
+	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", cfg.s3Bucket, cfg.s3Region, fileName)
+}
+
 // Content-Type안에 들어 있는 Mime Type이 image/<확장자> 형태이므로 확장자만 가져오는 함수
 func mediaTypeToExt(mediaType string) string {
 	parts := strings.Split(mediaType, "/")

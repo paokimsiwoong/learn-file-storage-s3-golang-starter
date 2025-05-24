@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
 
 	"github.com/joho/godotenv"
@@ -18,6 +21,7 @@ type apiConfig struct {
 	platform         string
 	filepathRoot     string
 	assetsRoot       string
+	s3Client         *s3.Client
 	s3Bucket         string
 	s3Region         string
 	s3CfDistribution string
@@ -91,6 +95,28 @@ func main() {
 		log.Fatal("PORT environment variable is not set")
 	}
 
+	// @@@ AWS s3 Go SDK 설정 시작 @@@
+
+	// s3Cfg는 설정을 담는 aws.Config 타입
+	s3Cfg, err := config.LoadDefaultConfig(context.Background(), config.WithRegion(s3Region))
+	// func config.LoadDefaultConfig(ctx context.Context, optFns ...func(*config.LoadOptions) error) (cfg aws.Config, err error)
+	// empty context인 context.Background() 입력
+	// 환경변수 s3Region을 담은 optFn을 만들어주는 config.WithRegion 함수 사용
+	// // optFns 에는 func(*config.LoadOptions) error 타입 입력 필요
+	// // ==> config.WithRegion 함수가 반환하는 LoadOptionsFunc 타입이 해당 함수 시그니쳐 만족
+	// // // type LoadOptionsFunc func(*LoadOptions) error
+	// // // LoadOptionsFunc is a type alias for LoadOptions functional option
+
+	if err != nil {
+		log.Fatalf("Couldn't create s3 config: %v", err)
+	}
+
+	// s3 cfg를 이용해 s3 client 생성
+	s3Client := s3.NewFromConfig(s3Cfg)
+	// s3Client는 *s3.Client
+
+	// @@@ AWS s3 Go SDK 설정 종료 @@@
+
 	// 불러온 환경변수들, db 를 apiConfig 구조체에 저장
 	cfg := apiConfig{
 		db:               db,
@@ -98,6 +124,7 @@ func main() {
 		platform:         platform,
 		filepathRoot:     filepathRoot,
 		assetsRoot:       assetsRoot,
+		s3Client:         s3Client,
 		s3Bucket:         s3Bucket,
 		s3Region:         s3Region,
 		s3CfDistribution: s3CfDistribution,
