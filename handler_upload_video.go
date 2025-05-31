@@ -130,6 +130,14 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// 임시파일을 ffprobe명령어로 살펴보고 화면비를 얻기
+	// 반드시 io.Copy 뒤에 있어야 실제로 디스크에 저장된 임시파일의 데이터를 가져올 수 있음
+	videoAspectRatio, err := getVideoAspectRatio(tempFile.Name())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Unable to compute aspect ratio", err)
+		return
+	}
+
 	// tempFile은 io.Copy로 데이터를 복사받으면서 내부 포인터가 복사받은 데이터 끝부분을 가리키고 있음
 	// ==> Seek(0, io.SeekStart)로 데이터 첫부분을 가리키도록 변경
 	// // @@@ tempFile을 다시 사용해 s3에 복사하므로 포인터가 데이터 첫부분을 가리켜야 한다
@@ -146,7 +154,8 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	// @@@ s3에 파일 업로드 @@@
 
 	// 업로드에 필요한 정보를 담은 s3.PutObjectInput 구조체 생성
-	fileName := getAssetPath(mediaType)
+	fileName := getS3AssetPath(mediaType, videoAspectRatio)
+	// 파일이름은 <prefix>/<randName>.<file_extension> 형태
 	putObjectInput := s3.PutObjectInput{
 		// Bucket: &cfg.s3Bucket, // bucket 이름은 cfg.s3Bucket 또는 .env에 S3_BUCKET로 저장되어 있음
 		// @@@ 해답처럼 aws.String 활용하기
