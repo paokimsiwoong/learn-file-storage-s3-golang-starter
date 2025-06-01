@@ -151,6 +151,25 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	// 	return
 	// } 로 에러처리 하고 있음
 
+	// @@@ faststart 인코딩인 새파일 생성
+	newFilePath, err := processVideoForFastStart(tempFile.Name())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Unable to create a new faststart encoding video file", err)
+		return
+	}
+
+	newTempFile, err := os.Open(newFilePath)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Unable to open the new faststart encoding video file", err)
+		return
+	}
+	// 임시 파일 삭제를 defer 걸어두기
+	defer os.Remove(newFilePath)
+	// 임시 파일 Close defer 해서 메모리 누수 방지
+	defer newTempFile.Close()
+	// @@@ defer는 LIFO
+	// // @@@ 따라서 newTempFile.Close()가 먼저 실행되고 그 다음에 os.Remove가 실행된다
+
 	// @@@ s3에 파일 업로드 @@@
 
 	// 업로드에 필요한 정보를 담은 s3.PutObjectInput 구조체 생성
@@ -162,7 +181,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		Bucket: aws.String(cfg.s3Bucket),
 		// Key:    &fileName,
 		Key:  aws.String(fileName),
-		Body: tempFile,
+		Body: newTempFile,
 		// tempFile은 io.Reader 인터페이스도 구현(Read함수)
 		// ContentType: &mediaType,
 		ContentType: aws.String(mediaType),

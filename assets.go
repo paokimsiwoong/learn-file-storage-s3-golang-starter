@@ -216,3 +216,35 @@ func getVideoAspectRatio(filePath string) (string, error) {
 
 	return "other", nil
 }
+
+// moov atom(mp4 파일의 메타데이터를 담은 부분)가 뒤에 있는 mp4 파일을
+// fast start 인코딩으로 새로 인코딩해 moov atom이 앞에 있는 새 파일을 생성하고 그 새 파일의 경로를 반환하는 함수
+// @@@ moov atom이 뒤에 있는 파일의 경우 브라우저가 처음 스트리밍 할 때 GET 리퀘스트가 3개 이상 복수 생성된다
+// // @@@ (첫부분, moov atom이 있어야 재생가능하므로 끝부분 조금, 다시 첫부분에 이어지는 조금, ...)
+func processVideoForFastStart(filePath string) (string, error) {
+	// 새 파일 경로 string 생성
+	newFilePath := fmt.Sprintf("%s.processing", filePath)
+
+	// 인코딩하는 ffmpeg 명령어 생성
+	cmd := exec.Command("ffmpeg",
+		"-i", filePath,
+		"-c", "copy",
+		"-movflags", "faststart",
+		"-f", "mp4",
+		newFilePath)
+	// exec.Command는 명령어 이름과 args를 저장하는 exec.Cmd 구조체의 포인터를 반환
+
+	// @@@ 퍼플렉시티 제안
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	// @@@ cmd.Stderr에는 오류 발생시 ffmpeg가 내놓는 상세 에러 내역이 들어 있다
+
+	// 명령어 실행
+	err := cmd.Run()
+	if err != nil {
+		return "", fmt.Errorf("error running ffmpeg command: %w\n%s", err, stderr.String())
+	}
+
+	// 인코딩 성공 -> 새 파일 경로 반환
+	return newFilePath, nil
+}
