@@ -94,8 +94,18 @@ func (cfg *apiConfig) handlerVideoGet(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusNotFound, "Couldn't get video", err)
 		return
 	}
+	// @@@ video.VideoURL은 "<bucketName>,<fileName>" 형태
 
-	respondWithJSON(w, http.StatusOK, video)
+	// dbVideoToSignedVideo 메소드는
+	// VideoURL 필드에 변환된 presigned URL을 담은 새 database.Video 구조체를 반환
+	presignedVideo, err := cfg.dbVideoToSignedVideo(video)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Unable to create presigned url", err)
+		return
+	}
+
+	// 반환되는 presignedVideo는 db와 다르게 VideoURL 필드가 presigned URL
+	respondWithJSON(w, http.StatusOK, presignedVideo)
 }
 
 func (cfg *apiConfig) handlerVideosRetrieve(w http.ResponseWriter, r *http.Request) {
@@ -116,5 +126,19 @@ func (cfg *apiConfig) handlerVideosRetrieve(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, videos)
+	// 기존의 "<bucketName>,<fileName>" 형태를 VideoURL 필드에 가진 video들의 슬라이스 videos 대신
+	// VideoURL 필드에 presigned url을 저장한 presigned video를 담을 새로운 슬라이스
+	presignedVideos := make([]database.Video, len(videos))
+
+	for _, video := range videos {
+		presignedVideo, err := cfg.dbVideoToSignedVideo(video)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Unable to create presigned url", err)
+			return
+		}
+
+		presignedVideos = append(presignedVideos, presignedVideo)
+	}
+
+	respondWithJSON(w, http.StatusOK, presignedVideos)
 }

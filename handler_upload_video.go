@@ -194,9 +194,13 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// newVideoURL는 "<bucketName>,<fileName>" 형태
 	newVideoURL := cfg.getObjectURL(fileName)
-
 	video.VideoURL = &newVideoURL
+	// @@@ db에 저장되는 VideoURL은 <bucketName>,<fileName> 형태를 유지해야 handlerVideoGet과 같은 다른 함수에서도
+	// @@@ <bucketName>,<fileName> 값을 접근해 dbVideoToSignedVideo가 사용가능해진다
+	// @@@ 여기서 presignedVideo, err := cfg.dbVideoToSignedVideo(video)를 하고
+	// @@@ db에 저장되는 VideoURL값을 presigned URL로 변경해서 입력하면 안된다
 
 	// 갱신된 video를 db에 입력해 db 갱신
 	if err := cfg.db.UpdateVideo(video); err != nil {
@@ -204,5 +208,14 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, video)
+	// @@@ db가 아닌 http response에 보내는 databse.Video 구조체만 VideoURL 필드를 presigned url로 변경
+	// dbVideoToSignedVideo 메소드는
+	// VideoURL 필드에 변환된 presigned URL을 담은 새 database.Video 구조체를 반환
+	presignedVideo, err := cfg.dbVideoToSignedVideo(video)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Unable to create presigned url", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, presignedVideo)
 }
