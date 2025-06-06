@@ -2,21 +2,14 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
 )
 
 // assets_root 경로 디렉토리가 있는지 확인하고 없으면 디렉토리를 생성하는 함수
@@ -85,6 +78,12 @@ func (cfg apiConfig) getObjectURL(fileName string) string {
 	// @@@ private 버킷으로 변경 후 반환값 형태 <bucketName>,<fileName>로 변경
 	return fmt.Sprintf("%s,%s", cfg.s3Bucket, fileName)
 
+}
+
+// cloud front에 연결되는 url 생성하는 apiConfig method
+func (cfg apiConfig) getCFURL(fileName string) string {
+	// <cloud front domain name>/<fileName> 형태
+	return fmt.Sprintf("%s/%s", cfg.s3CfDistribution, fileName)
 }
 
 // Content-Type안에 들어 있는 Mime Type이 image/<확장자> 형태이므로 확장자만 가져오는 함수
@@ -260,62 +259,63 @@ func processVideoForFastStart(filePath string) (string, error) {
 	return newFilePath, nil
 }
 
-// 일정 시간이 지나면 expired 되는 pre-signed url을 생성하는 함수
-func generatePresignedURL(s3Client *s3.Client, bucket, key string, expireTime time.Duration) (string, error) {
-	// s3.NewPresignClient함수는
-	// pre-signed url 생성에 필요한 s3.PresignClient 구조체의 포인터 반환
-	presignClient := s3.NewPresignClient(s3Client)
+// @@@ cloud front 사용하면서 signed url 미사용
+// // 일정 시간이 지나면 expired 되는 pre-signed url을 생성하는 함수
+// func generatePresignedURL(s3Client *s3.Client, bucket, key string, expireTime time.Duration) (string, error) {
+// 	// s3.NewPresignClient함수는
+// 	// pre-signed url 생성에 필요한 s3.PresignClient 구조체의 포인터 반환
+// 	presignClient := s3.NewPresignClient(s3Client)
 
-	// PresignGetObject 메소드는 presign된 http request 생성
-	presignedHTTPRequest, err := presignClient.PresignGetObject(context.Background(),
-		&s3.GetObjectInput{ // s3.GetObjectInput 구조체는 Bucket, Key 필드 필수
-			Bucket: aws.String(bucket),
-			Key:    aws.String(key), // Key는 파일 이름(ex: portrait/<randName>.mp4)
-		},
-		s3.WithPresignExpires(expireTime), // 함수 옵션으로는 expire 기간을 추가해주는 s3.WithPresignExpires 사용
-	)
-	if err != nil {
-		return "", fmt.Errorf("error creating presigned http request: %w", err)
-	}
+// 	// PresignGetObject 메소드는 presign된 http request 생성
+// 	presignedHTTPRequest, err := presignClient.PresignGetObject(context.Background(),
+// 		&s3.GetObjectInput{ // s3.GetObjectInput 구조체는 Bucket, Key 필드 필수
+// 			Bucket: aws.String(bucket),
+// 			Key:    aws.String(key), // Key는 파일 이름(ex: portrait/<randName>.mp4)
+// 		},
+// 		s3.WithPresignExpires(expireTime), // 함수 옵션으로는 expire 기간을 추가해주는 s3.WithPresignExpires 사용
+// 	)
+// 	if err != nil {
+// 		return "", fmt.Errorf("error creating presigned http request: %w", err)
+// 	}
 
-	// fmt.Print(presignedHTTPRequest.URL)
-	// v4.PresignedHTTPRequest 구조체의 URL 필드를 반환
-	return presignedHTTPRequest.URL, nil
-}
+// 	// fmt.Print(presignedHTTPRequest.URL)
+// 	// v4.PresignedHTTPRequest 구조체의 URL 필드를 반환
+// 	return presignedHTTPRequest.URL, nil
+// }
 
-// database.Video 구조체를 입력받아(포인터가 아니므로 pass by value -> 원본 아님)
-// VideoURL 필드에 저장된 <버킷이름>,<파일이름>을 이용해 presigned URL을 생성하고
-// VideoURL 필드에 presigned URL이 채워진 database.Video 구조체를 반환하는 함수
-func (cfg *apiConfig) dbVideoToSignedVideo(video database.Video) (database.Video, error) {
-	// @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	// @@@ 아직 VideoURL에 데이터("<bucketName>,<fileName>" 형태의 스트링을 가리키는 포인터)가
-	// @@@ 들어가서 초기화되기 전인 경우 예외 처리하기
-	if video.VideoURL == nil {
-		return video, nil
-	}
-	// @@@ 즉 handlerUploadVideo 함수가 실행되어 VideoURL이 초기화되기 전(handlerVideoMetaCreate만 실행된 상태)
-	// @@@ video draft를 들어가면 handlerVideoGet나 handlerVideosRetrieve이 실행되면서
-	// @@@ dbVideoToSignedVideo가 실행되는데 video.VideoURL은 nil이므로 이 예외처리가 없으면 밑의 Split에서 에러 발생
-	// @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+// // database.Video 구조체를 입력받아(포인터가 아니므로 pass by value -> 원본 아님)
+// // VideoURL 필드에 저장된 <버킷이름>,<파일이름>을 이용해 presigned URL을 생성하고
+// // VideoURL 필드에 presigned URL이 채워진 database.Video 구조체를 반환하는 함수
+// func (cfg *apiConfig) dbVideoToSignedVideo(video database.Video) (database.Video, error) {
+// 	// @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+// 	// @@@ 아직 VideoURL에 데이터("<bucketName>,<fileName>" 형태의 스트링을 가리키는 포인터)가
+// 	// @@@ 들어가서 초기화되기 전인 경우 예외 처리하기
+// 	if video.VideoURL == nil {
+// 		return video, nil
+// 	}
+// 	// @@@ 즉 handlerUploadVideo 함수가 실행되어 VideoURL이 초기화되기 전(handlerVideoMetaCreate만 실행된 상태)
+// 	// @@@ video draft를 들어가면 handlerVideoGet나 handlerVideosRetrieve이 실행되면서
+// 	// @@@ dbVideoToSignedVideo가 실행되는데 video.VideoURL은 nil이므로 이 예외처리가 없으면 밑의 Split에서 에러 발생
+// 	// @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-	// VideoURL 필드에 저장된 <버킷이름>,<파일이름>을 Split으로 쪼개기
-	splitString := strings.Split(*video.VideoURL, ",")
-	if len(splitString) != 2 {
-		return database.Video{}, errors.New("error invalid videoURL : it must be in the form <bucketName>,<fileName>")
-	}
+// 	// VideoURL 필드에 저장된 <버킷이름>,<파일이름>을 Split으로 쪼개기
+// 	splitString := strings.Split(*video.VideoURL, ",")
+// 	if len(splitString) != 2 {
+// 		return database.Video{}, errors.New("error invalid videoURL : it must be in the form <bucketName>,<fileName>")
+// 	}
 
-	if cfg.s3Client == nil {
-		return database.Video{}, errors.New("error s3 client is nil")
-	}
+// 	if cfg.s3Client == nil {
+// 		return database.Video{}, errors.New("error s3 client is nil")
+// 	}
 
-	// presigned URL 생성
-	presignedURL, err := generatePresignedURL(cfg.s3Client, splitString[0], splitString[1], time.Hour)
-	if err != nil {
-		return database.Video{}, fmt.Errorf("error creating presigned url: %w", err)
-	}
+// 	// presigned URL 생성
+// 	presignedURL, err := generatePresignedURL(cfg.s3Client, splitString[0], splitString[1], time.Hour)
+// 	if err != nil {
+// 		return database.Video{}, fmt.Errorf("error creating presigned url: %w", err)
+// 	}
 
-	// VideoURL 필드에 생성한 presigned URL 입력
-	video.VideoURL = &presignedURL
+// 	// VideoURL 필드에 생성한 presigned URL 입력
+// 	video.VideoURL = &presignedURL
 
-	return video, nil
-}
+// 	return video, nil
+// }
